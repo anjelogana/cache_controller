@@ -1,7 +1,5 @@
-//https://www.edaplayground.com/x/acMT
-
 module cache_fsm    #(
-parameter BLOCKSIZE_W = 4 //For easy debugging for counter, but default is 5
+parameter BLOCKSIZE_W = 5 //For easy debugging for counter, but default is 5
 )(
     input clk,
     input rst,
@@ -27,30 +25,33 @@ parameter BLOCKSIZE_W = 4 //For easy debugging for counter, but default is 5
         MISS = 3'b011, 					//3
         KEEP_COHERANCY_DIRTY = 3'b100,	//4
         WR_MISS = 3'b101, 				//5
-        RD_MISS = 3'b110; 				//6
+        RD_MISS = 3'b110, 				//6
+        RST_STATE = 3'b111;			    //7
 
     reg [2:0] current_state, next_state, previous_state;
     
-    reg start_counting = 0;
-	//reg sticky_reg_count;
+    reg start_counting;
+    reg start_counting_next;
+    //reg sticky_reg_count;
     always @(posedge clk or posedge rst) begin
         if (rst) begin
-            current_state <= IDLE;
-            previous_state <= IDLE;
+            current_state <= RST_STATE;
+            previous_state <= RST_STATE;
+            start_counting <= 0;
         end else begin
             current_state <= next_state;
             previous_state <= current_state; // Track the previous state
+            start_counting <= start_counting_next;
         end
     end
-    
+
     always @(posedge clk or posedge rst) begin
         //memstrb <= 0; // Default value
         //addr_offset_counter <= 0; //Remove This, this will reset it to 0 each time
-      	sticky_reg_count <= sticky_reg_count | start_counting;
+        sticky_reg_count <= sticky_reg_count | start_counting;
         if (rst) begin
             addr_offset_counter <= {BLOCKSIZE_W{1'b0}}; // BEGIN: Use parameter for reset
-            start_counting <= 0; // Reset start_counting
-          	sticky_reg_count <= 0;
+            sticky_reg_count <= 0;
             memstrb <= 0;
         end else if (sticky_reg_count == 1'b1) begin
             if (addr_offset_counter < {BLOCKSIZE_W{1'b1}} && memstrb) begin
@@ -60,15 +61,14 @@ parameter BLOCKSIZE_W = 4 //For easy debugging for counter, but default is 5
                 memstrb <= 1; 
             end else begin
                 addr_offset_counter <= {BLOCKSIZE_W{1'b0}}; // BEGIN: Use parameter for reset
-                start_counting <= 0; // Reset start_counting when max reached
-              	sticky_reg_count <= 0;
+                sticky_reg_count <= 0;
                 memstrb <= 0; // Reset memstrb as well
             end
         end
     end
     always @(*) begin
         // Default values for outputs
-        start_counting = 0; // Default to 0 unless explicitly set
+        start_counting_next = 0; // Default to 0 unless explicitly set
         dirty = 0;
         valid = 0;
         mux_sel = 0;
@@ -79,7 +79,6 @@ parameter BLOCKSIZE_W = 4 //For easy debugging for counter, but default is 5
     
         case (current_state)
             IDLE: begin //0
-                rdy = 1;
                 if (hit && wr_rd_cpu_q && cs_sampled_dly) begin
                     next_state = WRITE_HIT;
                 end else if (hit && !wr_rd_cpu_q && cs_sampled_dly) begin
@@ -88,6 +87,11 @@ parameter BLOCKSIZE_W = 4 //For easy debugging for counter, but default is 5
                     next_state = MISS;
                 end else begin
                     next_state = IDLE;
+                    if (previous_state != IDLE) begin // Check if we just entered IDLE
+                        rdy = 1; // Set rdy to 1
+                    end else begin
+                        rdy = 0; // Reset rdy to 0
+                    end
                 end
             end
             WRITE_HIT: begin //1
@@ -114,6 +118,7 @@ parameter BLOCKSIZE_W = 4 //For easy debugging for counter, but default is 5
             end
             MISS: begin			//3
               	rdy = 0;
+                valid = 0;
               if ((!dirty_input || previous_state == KEEP_COHERANCY_DIRTY)&& wr_rd_cpu_q) //FIXME
                     next_state = WR_MISS; 
               else if ((!dirty_input || previous_state == KEEP_COHERANCY_DIRTY) && !wr_rd_cpu_q)
@@ -122,15 +127,16 @@ parameter BLOCKSIZE_W = 4 //For easy debugging for counter, but default is 5
                     next_state = KEEP_COHERANCY_DIRTY;
             end
             KEEP_COHERANCY_DIRTY: begin 	//4
+                wr_rd_sdram = 1; //Write to main memory
                 if (addr_offset_counter == {BLOCKSIZE_W{1'b1}}) begin // BEGIN: Use parameter for comparison
                     mux_sel = 0;
                     demux_sel = 0;
 
                     wen_sram = 0;
-                    wr_rd_sdram = 1; //Write to main memory
+                    wr_rd_sdram = 0; //Write to main memory
 
                     dirty = 0;
-                    valid = 0;
+                    valid = 1;
                     next_state = MISS;
                 end else begin
                   if (previous_state != KEEP_COHERANCY_DIRTY) begin // Trigger start_counting only when transitioning into KEEP_COHERANCY_DIRTY
@@ -166,9 +172,14 @@ parameter BLOCKSIZE_W = 4 //For easy debugging for counter, but default is 5
                     next_state = RD_MISS;
                 end
             end
+            RST_STATE: begin // BEGIN: Implement RST_STATE
+                // Reset logic here
+                next_state = IDLE;
+            end // END: Implement RST_STATE
+
             default: next_state = IDLE;
         endcase
     end
 
-
+    
 endmodule

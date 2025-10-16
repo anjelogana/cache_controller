@@ -1,20 +1,21 @@
-----------------------------------------------------------------------------------
--- Company:				            Ryerson University 
--- Engineer VHDL Version: 			Victor Dumitriu
--- Engineer Verilog Version:        Anjelo Gana
--- Design Name: 		CPU Read/Write Transaction Generator
--- Module Name:		CPU_gen - Behavioral 
--- Target Devices: 	XC3S500E
---
--- Description: 		A testbench circuit for course COE758, Project 1.
---							The circuit plays the role of a CPU, generating read
---							and write transactions to various addresses. The Cache
---							Controller being designed for Project 1 must respond to
---							these transactions.
---
--- Dependencies: 		None.
-----------------------------------------------------------------------------------
-
+//https://www.edaplayground.com/x/Usfr
+//----------------------------------------------------------------------------------
+// Company:				            Ryerson University 
+// Engineer VHDL Version: 			Victor Dumitriu
+// Engineer Verilog Version:        Anjelo Gana
+// Design Name: 		CPU Read/Write Transaction Generator
+// Module Name:		CPU_gen - Behavioral 
+// Target Devices: 	XC3S500E
+//
+// Description: 		A testbench circuit for course COE758, Project 1.
+//							The circuit plays the role of a CPU, generating read
+//							and write transactions to various addresses. The Cache
+//							Controller being designed for Project 1 must respond to
+//							these transactions.
+//
+// Dependencies: 		None.
+//--------------------------------------------------------------------------------
+//https://www.edaplayground.com/x/H5i6
 module CPU_gen (
     input clk,
     input rst,
@@ -114,7 +115,7 @@ module CPU_gen (
         rReg2 <= rReg1;
     end
 
-    assign trig_r = rReg1 & ~rReg2;
+    assign trig_r = rReg1;
 
     // Output connections.
     always @(*) begin

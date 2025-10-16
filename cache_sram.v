@@ -1,6 +1,6 @@
-module # (
+module cache_sram # (
 parameter ADDR_WIDTH = 8,
-parameter DEPTH = 2**ADDR_WIDTH // 2^ADDR_WIDTH
+parameter DEPTH = 2**8// 2^ADDR_WIDTH
 ) (
     input clk,
     input rst,

@@ -1,7 +1,5 @@
-//https://www.edaplayground.com/x/acMT
-
 module cache_fsm    #(
-parameter BLOCKSIZE_W = 4 //For easy debugging for counter, but default is 5
+parameter BLOCKSIZE_W = 5 //For easy debugging for counter, but default is 5
 )(
     input clk,
     input rst,
@@ -37,6 +35,7 @@ parameter BLOCKSIZE_W = 4 //For easy debugging for counter, but default is 5
         if (rst) begin
             current_state <= IDLE;
             previous_state <= IDLE;
+          
         end else begin
             current_state <= next_state;
             previous_state <= current_state; // Track the previous state
@@ -114,6 +113,7 @@ parameter BLOCKSIZE_W = 4 //For easy debugging for counter, but default is 5
             end
             MISS: begin			//3
               	rdy = 0;
+                valid = 0;
               if ((!dirty_input || previous_state == KEEP_COHERANCY_DIRTY)&& wr_rd_cpu_q) //FIXME
                     next_state = WR_MISS; 
               else if ((!dirty_input || previous_state == KEEP_COHERANCY_DIRTY) && !wr_rd_cpu_q)
@@ -122,15 +122,16 @@ parameter BLOCKSIZE_W = 4 //For easy debugging for counter, but default is 5
                     next_state = KEEP_COHERANCY_DIRTY;
             end
             KEEP_COHERANCY_DIRTY: begin 	//4
+                wr_rd_sdram = 1; //Write to main memory
                 if (addr_offset_counter == {BLOCKSIZE_W{1'b1}}) begin // BEGIN: Use parameter for comparison
                     mux_sel = 0;
                     demux_sel = 0;
 
                     wen_sram = 0;
-                    wr_rd_sdram = 1; //Write to main memory
+                    wr_rd_sdram = 0; //Write to main memory
 
                     dirty = 0;
-                    valid = 0;
+                    valid = 1;
                     next_state = MISS;
                 end else begin
                   if (previous_state != KEEP_COHERANCY_DIRTY) begin // Trigger start_counting only when transitioning into KEEP_COHERANCY_DIRTY

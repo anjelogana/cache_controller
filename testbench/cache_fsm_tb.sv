@@ -1,4 +1,3 @@
-//https://www.edaplayground.com/x/acMT
 module cache_fsm_tb;
 
     // Inputs
@@ -7,6 +6,8 @@ module cache_fsm_tb;
     reg hit;
     reg wr_rd_cpu_q;
   	reg cs_sampled_dly;
+  
+  	reg dirty_input; //FIXME
 
     // Outputs
     wire dirty;
@@ -20,10 +21,11 @@ module cache_fsm_tb;
     wire memstrb;
 
     // Instantiate the cache_fsm module
-    cache_fsm uut (
+  cache_fsm uut(
         .clk(clk),
         .rst(rst),
         .hit(hit),
+      	.dirty_input(dirty_input), //FIXME
       	.cs_sampled_dly(cs_sampled_dly),
         .wr_rd_cpu_q(wr_rd_cpu_q),
         .dirty(dirty),
@@ -42,8 +44,12 @@ module cache_fsm_tb;
     always #5 clk = ~clk;
 
     // Select which test case to run (0 to 6)
-    parameter integer test_case = 2; // <-- change this number to run a different test
-
+    parameter integer test_case = 5; // <-- change this number to run a different test
+	
+  	//To Do:
+  	//Why counter only 15Mstrb instead of 16
+  
+  	
     // Test sequence
     initial begin
         $dumpfile("dump.vcd");
@@ -54,6 +60,7 @@ module cache_fsm_tb;
         hit = 0;
         wr_rd_cpu_q = 0;
         cs_sampled_dly =0;
+      	dirty_input = 0; //FIXME
         #10 rst = 0; // release reset
 
         // Run the selected test case
@@ -93,6 +100,7 @@ module cache_fsm_tb;
                 cs_sampled_dly = 1;
                 #10;
                 cs_sampled_dly = 0;
+              	#500;
             end
             4: begin
                 // Test 4: Cache miss, dirty=1, write
@@ -100,8 +108,10 @@ module cache_fsm_tb;
                 // force dirty = 1; // optional if you want to override
                 wr_rd_cpu_q = 1;
                 cs_sampled_dly = 1;
+              	dirty_input	= 1;
                 #10;
                 cs_sampled_dly = 0;
+              	#1000;
             end
             5: begin
                 // Test 5: Cache miss, dirty=1, read
@@ -109,8 +119,10 @@ module cache_fsm_tb;
                 // force dirty = 1; // optional if you want to override
                 wr_rd_cpu_q = 0;
                 cs_sampled_dly = 1;
+              	dirty_input	= 1;
                 #10;
                 cs_sampled_dly = 0;
+              	#1000;
             end
             6: begin
                 // Test 6: Reset FSM

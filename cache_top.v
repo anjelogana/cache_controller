@@ -1,8 +1,11 @@
+`include "cache_controller.v"
+`include "cache_sram.v"
+`include "CPU_gen.v"
 module cache_top #(
     parameter ADDR_WIDTH = 16,
     parameter ADDR_WIDTH_SRAM = 8,
-    parameter DATA_WIDTH = 8
-    parameter DEPTH = 2**ADDR_WIDTH_SRAM;
+    parameter DATA_WIDTH = 8,
+    parameter DEPTH = 2**ADDR_WIDTH_SRAM
 )(
     input clk,
     input rst,
@@ -14,17 +17,21 @@ module cache_top #(
     output reg din_cpu,
     output reg rdy_cpu,
     //Cache - SDRAM Interface 
-    input [ADDR_WIDTH-1:0] DOut_sdram,
-    output reg [15:0] Address_sdram,
+    input [DATA_WIDTH-1:0] DOut_sdram,
+    output reg [ADDR_WIDTH-1:0] Address_sdram,
     output reg wr_rd_sdram,
     output reg mstrb_sdram,
-    output reg din_sdram
+    output reg [DATA_WIDTH-1:0] din_sdram,
+    
+    // Added missing ports
+    output wire mux_sel,
+    output wire demux_sel,
+    output wire wen_sram,
+    output wire [ADDR_WIDTH_SRAM-1:0] address_cache_ctrl_sram
 );
 
 wire din_sram;
 wire dout_sram;
-
-wire address_cache_ctrl_sram [ADDR_WIDTH_SRAM-1:0];
 
 cache_sram #(
     .ADDR_WIDTH(ADDR_WIDTH_SRAM),
@@ -33,7 +40,7 @@ cache_sram #(
     .clk(clk),
     .rst(rst),
     .Address(address_cache_ctrl_sram), // Using lower 8 bits for cache addressing
-    .wr_rd(wr_rd_cpu),
+    .wr_rd(wen_sram),
     .DIn(din_sram),
     .DOut(dout_sram)
 );
@@ -49,11 +56,11 @@ cache_controller #(
 
     //CPU - Cache Interface
     .Address_cpu(Address_cpu),
+    .DOut_cpu(DOut_cpu),
     .wr_rd_cpu(wr_rd_cpu),
     .cs_cpu(cs_cpu),
     .rdy_cpu(rdy_cpu),
-    .DOut_cpu(DOut_cpu),
-
+    
     //Cache - SDRAM Interface 
     .Address_sdram(Address_sdram),
     .wr_rd_sdram(wr_rd_sdram),
@@ -65,10 +72,11 @@ cache_controller #(
     .wen_sram(wen_sram),
     .address_cache_ctrl_sram(address_cache_ctrl_sram)
 );
+
 //Mux
 assign din_sram = (mux_sel) ? DOut_sdram : din_cpu;
 
 //Demux
-assign din_sdram = (~demux_sel) ? dout_sram : 8'bz;
-assign din_cpu = (demux_sel) ? : dout_sram : 8'bz;
+assign din_sdram = (~demux_sel) ? dout_sram : {DATA_WIDTH{1'bz}};
+assign din_cpu = (demux_sel) ? dout_sram : {DATA_WIDTH{1'bz}};
 endmodule
