@@ -1,23 +1,6 @@
-`timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date:    10:38:49 10/15/2025 
-// Design Name: 
-// Module Name:    cache_top 
-// Project Name: 
-// Target Devices: 
-// Tool versions: 
-// Description: 
-//
-// Dependencies: 
-//
-// Revision: 
-// Revision 0.01 - File Created
-// Additional Comments: 
-//
-//////////////////////////////////////////////////////////////////////////////////
+`include "cache_controller.v"
+`include "cache_sram.v"
+`include "CPU_gen.v"
 module cache_top #(
     parameter ADDR_WIDTH = 16,
     parameter ADDR_WIDTH_SRAM = 8,
@@ -31,14 +14,14 @@ module cache_top #(
     input wr_rd_cpu,
     input cs_cpu,
     input [DATA_WIDTH-1:0] DOut_cpu,
-    output wire din_cpu,
-    output wire rdy_cpu,
+    output reg din_cpu,
+    output reg rdy_cpu,
     //Cache - SDRAM Interface 
     input [DATA_WIDTH-1:0] DOut_sdram,
-    output wire [ADDR_WIDTH-1:0] Address_sdram,
-    output wire wr_rd_sdram,
-    output wire mstrb_sdram,
-    output wire [DATA_WIDTH-1:0] din_sdram,
+    output reg [ADDR_WIDTH-1:0] Address_sdram,
+    output reg wr_rd_sdram,
+    output reg mstrb_sdram,
+    output reg [DATA_WIDTH-1:0] din_sdram,
     
     // Added missing ports
     output wire mux_sel,
@@ -47,16 +30,19 @@ module cache_top #(
     output wire [ADDR_WIDTH_SRAM-1:0] address_cache_ctrl_sram
 );
 
-wire [7:0] din_sram;
-wire [7:0] dout_sram;
+wire din_sram;
+wire dout_sram;
 
-cache_sram cache_memory (
-    .clka(clk),
-    .rsta(rst),
-    .addra(address_cache_ctrl_sram), // Using lower 8 bits for cache addressing
-    .wea(wen_sram),
-    .dina(din_sram),
-    .douta(dout_sram)
+cache_sram #(
+    .ADDR_WIDTH(ADDR_WIDTH_SRAM),
+    .DEPTH(DEPTH)
+) cache_memory (
+    .clk(clk),
+    .rst(rst),
+    .Address(address_cache_ctrl_sram), // Using lower 8 bits for cache addressing
+    .wr_rd(wen_sram),
+    .DIn(din_sram),
+    .DOut(dout_sram)
 );
 
 cache_controller #(
@@ -88,7 +74,7 @@ cache_controller #(
 );
 
 //Mux
-assign din_sram = (mux_sel) ? DOut_sdram : DOut_cpu;
+assign din_sram = (mux_sel) ? DOut_sdram : din_cpu;
 
 //Demux
 assign din_sdram = (~demux_sel) ? dout_sram : {DATA_WIDTH{1'bz}};

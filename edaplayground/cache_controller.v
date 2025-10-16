@@ -1,3 +1,4 @@
+//https://www.edaplayground.com/x/P7YL
 `include "cache_fsm.v"
 
 module cache_controller #(
@@ -17,17 +18,17 @@ module cache_controller #(
     input wr_rd_cpu,
     input cs_cpu,
 
-    output wire rdy_cpu,
+    output reg rdy_cpu,
     //Cache - SDRAM Interface 
     output reg [ADDR_WIDTH-1:0] Address_sdram,
-    output wire wr_rd_sdram,
-    output wire mstrb_sdram,
+    output reg wr_rd_sdram,
+    output reg mstrb_sdram,
 
   
     //Staying in Cache_top
-    output wire mux_sel,
-    output wire demux_sel,
-    output wire wen_sram,
+    output reg mux_sel,
+    output reg demux_sel,
+    output reg wen_sram,
     output reg [ADDR_WIDTH_SRAM-1:0] address_cache_ctrl_sram // Corrected array declaration
 );
 
@@ -43,29 +44,31 @@ reg cs_sampled;
 reg cs_sampled_dly;
 
 reg [2+TAG_SIZE-1:0] cache_line [0:DEPTH-1]; //Upper Bit is valid, next bit is dirty, rest is tag
-integer i;
 
-reg hit;
-reg dirty;
-wire valid;
-reg valid_q; //Delay since Dirty is 1 cycle behind hit
-wire [OFFSET_SIZE-1:0] addr_offset_counter; // Changed to wire
-wire dirty_output;
-
-// Combined always block for cache_line and related logic
 always @ (posedge clk or posedge rst) begin
     if (rst) begin
-        // Reset cache_line and other signals
+        integer i;
         for (i = 0; i < DEPTH; i = i + 1) begin
             cache_line[i] <= 0; // Set all cache_line entries to 0 on reset
         end
+    end
+end
+//RD -> cache_line [index] [depth]
+reg hit;
+reg dirty;
+reg valid;
+reg valid_q; //Delay since Dirty is 1 cycle behind hit
+reg [OFFSET_SIZE-1:0] addr_offset_counter; // Added declaration for addr_offset_counter
+reg dirty_output;
+
+
+
+//Counter to wait 4 clock cycles before capturing ADD, DOUT, WR_RD from CPU
+always @ (posedge clk or posedge rst) begin
+    if (rst) begin
         cs_counter <= 0;
         cs_sampled <= 0;
-        hit <= 0;
-        cs_sampled_dly <= 0;    
-        valid_q <= 0; 
     end else begin
-        // Counter to wait 4 clock cycles before capturing ADD, DOUT, WR_RD from CPU
         cs_sampled <= 0;
         if (cs_cpu == 1)
             cs_counter <= cs_counter + 1;
@@ -80,12 +83,20 @@ always @ (posedge clk or posedge rst) begin
             offset_add <= Address_cpu[4:0];
             DOut_cpu_q <= DOut_cpu;             
         end
+    end
+end
 
-        // Cacheline Logic
+//Cacheline Logic
+always @ (posedge clk or posedge rst) begin
+    if (rst) begin
+        hit <= 0;
+        cs_sampled_dly <= 0;    
+        valid_q <= 0; 
+    end else begin
         wr_rd_cpu_q <= wr_rd_cpu;                           //Align with inputs to FSM
         cs_sampled_dly <= cs_sampled;                       //Align with inputs to FSM
         dirty <= cache_line[index_add][TAG_SIZE];           //Input to FSM
-        valid_q <= valid;                                   //Delay since Dirty is 1 cycle behind hit (Update Cacheline Value)
+        valid_q <= valid;                                 //Delay since Dirty is 1 cycle behind hit (Update Cacheline Value)
         if (cs_sampled && (cache_line[index_add][TAG_SIZE-1:0] == tag_add && dirty)) begin //If index matches tag and valid. Hit
             hit <= 1;                                           //Hit
         end else if (cs_sampled && (cache_line[index_add][TAG_SIZE-1:0] != tag_add || !dirty)) begin //MISS
