@@ -1,20 +1,23 @@
 `timescale 1ns / 1ps
-/////////////////////////////////////////////////////////////////////////////////
-// Company:             Ryerson University 
-// Engineer:            Victor Dumitriu
-// Modified in Verilog: Anjelo Gana
-// Design Name:         CPU Read/Write Transaction Generator
-// Module Name:         CPU_gen - Behavioral 
-// Target Devices:      XC3S500E
+//////////////////////////////////////////////////////////////////////////////////
+// Company: 
+// Engineer: 
+// 
+// Create Date:    11:09:58 10/15/2025 
+// Design Name: 
+// Module Name:    CPU_gen 
+// Project Name: 
+// Target Devices: 
+// Tool versions: 
+// Description: 
 //
-// Description:         A testbench circuit for course COE758, Project 1.
-//                      The circuit plays the role of a CPU, generating read
-//                      and write transactions to various addresses. The Cache
-//                      Controller being designed for Project 1 must respond to
-//                      these transactions.
+// Dependencies: 
 //
-// Dependencies:        None.
-/////////////////////////////////////////////////////////////////////////////////
+// Revision: 
+// Revision 0.01 - File Created
+// Additional Comments: 
+//
+//////////////////////////////////////////////////////////////////////////////////
 module CPU_gen (
     input clk,
     input rst,

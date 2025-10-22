@@ -7,6 +7,7 @@ module cache_controller #(
     parameter DEPTH = 8,
     parameter TAG_SIZE = 8,
     parameter INDEX_SIZE = 3,
+    parameter BLOCKSIZE_W = 5,
     parameter OFFSET_SIZE = 5
 )(
     input clk,
@@ -21,9 +22,10 @@ module cache_controller #(
     //Cache - SDRAM Interface 
     output reg [ADDR_WIDTH-1:0] Address_sdram,
     output wire wr_rd_sdram,
-    output wire mstrb_sdram,
 
-  
+    output reg mstrb_sdram,
+    output wire [2:0] current_state,
+
     //Staying in Cache_top
     output wire mux_sel,
     output wire demux_sel,
@@ -49,8 +51,15 @@ reg hit;
 reg dirty;
 wire valid;
 reg valid_q; //Delay since Dirty is 1 cycle behind hit
+
 wire [OFFSET_SIZE-1:0] addr_offset_counter; // Changed to wire
 wire dirty_output;
+
+reg [ADDR_WIDTH-1:0] Address_sdram_q; //Delay 1 Clk Cycle to Delay
+
+wire mstrb_sdram_fsm;
+reg mstrb_sdram_q; //Delay by 2 clk to allign with Memstrb updating ADD for SRAM and SDRAM
+
 
 // Combined always block for cache_line and related logic
 always @ (posedge clk or posedge rst) begin
@@ -64,9 +73,14 @@ always @ (posedge clk or posedge rst) begin
         hit <= 0;
         cs_sampled_dly <= 0;    
         valid_q <= 0; 
+        Address_sdram <= {ADDR_WIDTH{1'b0}}; 
+		  mstrb_sdram <= 0;
+        mstrb_sdram_q <= 0;
     end else begin
         // Counter to wait 4 clock cycles before capturing ADD, DOUT, WR_RD from CPU
         cs_sampled <= 0;
+        mstrb_sdram_q <= mstrb_sdram_fsm;
+        mstrb_sdram <= mstrb_sdram_q;
         if (cs_cpu == 1)
             cs_counter <= cs_counter + 1;
         if (cs_cpu == 0)
@@ -92,11 +106,21 @@ always @ (posedge clk or posedge rst) begin
             hit <= 0;
         end else if (valid_q) begin
             cache_line[index_add] <= {valid_q, dirty_output, tag_add}; // Update entire cache line after miss
-        end else if (!dirty) begin
-            address_cache_ctrl_sram <= {index_add,offset_add}; // Update SRAM address
-        end
+        end else if (mstrb_sdram_fsm && dirty) begin //Fix Coherancy SRAM to SDRAM
+            // Make sure the concat widths match ADDR_WIDTH
+            Address_sdram <= {cache_line[index_add][TAG_SIZE-1:0], index_add, addr_offset_counter };
+            address_cache_ctrl_sram <= {index_add, addr_offset_counter};
+        end else if (mstrb_sdram_fsm && !dirty) begin //SDRAM to SRAM when miss
+            address_cache_ctrl_sram <= {index_add,addr_offset_counter};
+            Address_sdram <= {tag_add, index_add, addr_offset_counter };
+            if (addr_offset_counter == 5'b11111) 
+                address_cache_ctrl_sram <= {index_add,offset_add}; //Write to SRAM
+        end else if (dirty) begin //Update SRAM Address When Hit
+            address_cache_ctrl_sram <= {index_add,offset_add}; // Update SRAM address when hit
+        end 
     end
 end
+
 
 //Write to cache line
 
@@ -116,8 +140,9 @@ cache_fsm cache_fsm_inst (
     .rdy(rdy_cpu),
     .wen_sram(wen_sram),
     .wr_rd_sdram(wr_rd_sdram),
-    .addr_offset_counter(addr_offset_counter), // Ensure this signal is connected
-    .memstrb(mstrb_sdram)
+    .addr_offset_counter(addr_offset_counter),
+    .memstrb(mstrb_sdram_fsm),
+    .current_state(current_state)
 );
 
 endmodule

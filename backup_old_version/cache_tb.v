@@ -17,9 +17,14 @@ wire [ADDR_WIDTH-1:0] Address_cpu;
 wire [DATA_WIDTH-1:0] DOut_cpu;
 wire wr_rd_cpu;
 wire cs_cpu;
+reg din_cpu;
+
+
 
 wire rdy_cpu;
 wire [ADDR_WIDTH-1:0] Address_sdram;
+wire [DATA_WIDTH-1:0] DOut_sdram;
+wire [DATA_WIDTH-1:0] din_sdram;
 wire wr_rd_sdram;
 wire mstrb_sdram;
 
@@ -44,18 +49,19 @@ CPU_gen uut_cpu_gen (
 cache_top uut_cache_top (
     .clk(clk),
     .rst(rst),
+    // CPU - Cache Interface
     .Address_cpu(Address_cpu),
-    .DOut_cpu(DOut_cpu),
     .wr_rd_cpu(wr_rd_cpu),
     .cs_cpu(cs_cpu),
+    .DOut_cpu(DOut_cpu),
     .rdy_cpu(rdy_cpu),
+    .din_cpu(din_cpu),
+
     .Address_sdram(Address_sdram),
+    .DOut_sdram(DOut_sdram),
     .wr_rd_sdram(wr_rd_sdram),
     .mstrb_sdram(mstrb_sdram),
-    .mux_sel(mux_sel),
-    .demux_sel(demux_sel),
-    .wen_sram(wen_sram),
-    .address_cache_ctrl_sram(address_cache_ctrl_sram)
+    .din_sdram(din_sdram)
 );
 
 // Clock generation
@@ -70,7 +76,7 @@ initial begin
 
     #40 rst = 0;
 
-    #10000; // Run the simulation for a sufficient time
+    #100; // Run the simulation for a sufficient time
     $display("Testbench completed");
 
 
