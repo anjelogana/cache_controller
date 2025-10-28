@@ -37,6 +37,8 @@ parameter BLOCKSIZE_W = 5 //For easy debugging for counter, but default is 5
     reg [BLOCKSIZE_W-1:0] addr_offset_counter_q, addr_offset_counter_qq; //For SRAM to SDRAM
     reg [BLOCKSIZE_W-1:0] addr_offset_counter_qqq, addr_offset_counter_qqqq; //For SDRAM to SRAM
     reg memstrb_q, memstrb_qq; //For writing back sdram data to sram
+
+    reg delay_count = 0;
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             current_state <= RST_STATE;
@@ -93,7 +95,7 @@ parameter BLOCKSIZE_W = 5 //For easy debugging for counter, but default is 5
         rdy = 0;
         wen_sram = 0;
         wr_rd_sdram = 0;
-    
+        dirty_count = 0;
         case (current_state)
             IDLE: begin //0
                 if (hit && wr_rd_cpu_q && cs_sampled_dly) begin
@@ -112,20 +114,33 @@ parameter BLOCKSIZE_W = 5 //For easy debugging for counter, but default is 5
                 end
             end
             WRITE_HIT: begin //1
-              	rdy = 0;
-                dirty = 1;
-                mux_sel = 0;
-                wen_sram = 1;
-                wr_rd_sdram = 0;
-                next_state = IDLE;
+                if (previous_state == WR_MISS || delay_count<2'b11) begin //Delay because SRAM ADD needs to reach 32nd before Dirty bit is updated
+                    delay_count = delay_count + 1;
+                    next_state = WRITE_HIT;
+                end else begin
+                    rdy = 0;
+                    mux_sel = 0;
+                    wen_sram = 1;
+                    wr_rd_sdram = 0;
+					dirty = 1; //Write to sram
+                    delay_count = 0;
+                    next_state = IDLE;
+                end
             end
             READ_HIT: begin 	//2
-              	rdy = 0;
-                mux_sel = 0;
-                demux_sel = 1; //Since hit no need to interact with main memory
-                wen_sram = 0;
-                wr_rd_sdram = 0;
-                next_state = IDLE;
+                if (previous_state == RD_MISS || delay_count<2'b11) begin
+                    delay_count = delay_count + 1;
+                    next_state = READ_HIT;
+                end else begin
+                    rdy = 0;
+                    mux_sel = 0;
+                    demux_sel = 1; //Since hit no need to interact with main memory
+                    wen_sram = 0;
+                    wr_rd_sdram = 0;
+					dirty = 1; //Write to sram
+                    delay_count = 0;
+                    next_state = IDLE;
+                end
             end
             MISS: begin			//3
               	rdy = 0;
@@ -156,7 +171,7 @@ parameter BLOCKSIZE_W = 5 //For easy debugging for counter, but default is 5
             end
             WR_MISS: begin			//5
                 demux_sel = 1; //Not needed but for clarity in chipscope 
-                if (addr_offset_counter_qq == {BLOCKSIZE_W{1'b1}}) begin
+                if (addr_offset_counter_qqqq == {BLOCKSIZE_W{1'b1}} && previous_state_q!= MISS) begin
                     valid = 1;
                     mux_sel = 0;
                     next_state = WRITE_HIT;
@@ -172,7 +187,7 @@ parameter BLOCKSIZE_W = 5 //For easy debugging for counter, but default is 5
             end
             RD_MISS: begin			//6
                 demux_sel = 1; //Not needed but for clarity in chipscope 
-                if (addr_offset_counter_qq == {BLOCKSIZE_W{1'b1}}) begin
+                if (addr_offset_counter_qqqq == {BLOCKSIZE_W{1'b1}} && previous_state_q!= MISS) begin
                     valid = 1;
                   	mux_sel = 0;
                     next_state = READ_HIT;

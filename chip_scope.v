@@ -1,4 +1,9 @@
-module tutorial1 (
+module tutorial1 #(
+    parameter ADDR_WIDTH = 16,
+    parameter ADDR_WIDTH_SRAM = 8,
+    parameter DATA_WIDTH = 8,
+    parameter DEPTH = 2**ADDR_WIDTH_SRAM
+) (
     input clk,
     output [7:0] led,
     input [3:0] switches
@@ -28,6 +33,16 @@ wire [2:0] current_state;
 wire [35:0] control0,control1;
 wire [17:0] vio_out;
 reg clk_half;
+
+
+//Internal signals from cache_top
+wire mux_sel;
+wire demux_sel;
+wire [ADDR_WIDTH_SRAM-1:0] address_cache_ctrl_sram;
+wire [DATA_WIDTH-1:0] din_sram;
+wire [DATA_WIDTH-1:0] dout_sram;
+wire wen_sram;
+
 // ChipScope components
 icon sys_icon (
     .CONTROL0(control0),
@@ -72,22 +87,47 @@ cache_top cache_top_uut (
     .wr_rd_sdram(wr_rd_sdram),
     .mstrb_sdram(mstrb_sdram),
     .din_sdram(din_sdram),
-    .current_state(current_state)
+    .current_state(current_state),
+    
+    .mux_sel(mux_sel),
+    .demux_sel(demux_sel),
+    .address_cache_ctrl_sram(address_cache_ctrl_sram),
+    .din_sram(din_sram),
+    .dout_sram(dout_sram),
+    .wen_sram(wen_sram)
+    
 );
 
 // Assign cache outputs to ILA for monitoring (individual assignments)
-assign ila_data[63:48] = Address_cpu[15:0];      // CPU address bus
-assign ila_data[47:40] = DOut_cpu[7:0];          // CPU data output
-assign ila_data[39]    = wr_rd_cpu;              // CPU write/read control
-assign ila_data[38]    = cs_cpu;                 // CPU chip select
-assign ila_data[37:22] = Address_sdram[15:0];    // SDRAM address bus
-assign ila_data[21:14] = din_sdram[7:0];         // SDRAM data input
-assign ila_data[13]    = wr_rd_sdram;            // SDRAM write/read control
-assign ila_data[12]    = mstrb_sdram;            // SDRAM memory strobe
-assign ila_data[11:9]  = current_state;          // Current FSM state
-assign ila_data[8]     = rst;                    // Reset signal
-assign ila_data[7]	  = clk_half;
-assign ila_data[6:0]   = 8'b0;                   // Padding
+
+assign ila_data[0]	  = clk_half;
+assign ila_data[1]     = rst;                    // Reset signal
+
+//CPU
+assign ila_data[17:2] = Address_cpu[15:0];      // CPU address bus
+assign ila_data[25:18] = DOut_cpu[7:0];          // CPU data output
+assign ila_data[26]    = wr_rd_cpu;              // CPU write/read control
+assign ila_data[27]    = cs_cpu;                 // CPU chip select
+
+//SDRAM
+assign ila_data[33:28] = Address_sdram[15:0];    // SDRAM address bus
+assign ila_data[41:34] = din_sdram[7:0];         // SDRAM data input
+assign ila_data[42]    = wr_rd_sdram;            // SDRAM write/read control
+assign ila_data[43]    = mstrb_sdram;            // SDRAM memory strobe
+
+//SRAM
+assign ila_data[49:44] = address_cache_ctrl_sram[5:0]; // SRAM address bus
+assign ila_data[57:50] = din_sram[7:0];              // SRAM data input
+assign ila_data[65:58] = dout_sram[7:0];            // SRAM data output
+assign ila_data[66]    = wen_sram;                 // SRAM write enable
+
+//MUX
+assign ila_data[67]    = mux_sel;                // SRAM data input select
+assign ila_data[68]    = demux_sel;              // SRAM data output select
+
+//FSM
+assign ila_data[71:69]  = current_state;          // Current FSM state
+
 
 // Synchronize rst with clock from VIO
 
